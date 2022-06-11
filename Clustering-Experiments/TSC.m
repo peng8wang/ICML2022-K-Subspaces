@@ -12,7 +12,7 @@ function [e, U] = TSC(Z, d, K, SC_type, q, dist)
     
     %% default parameter setting
     N = size(Z,2); %% the number of data points
-    
+    tic; 
     %% compute affinity matrix B
     Z1 = abs(Z'*Z); Z1 = Z1 - diag(diag(Z1)); B = zeros(N,N);    
     for j = 1:N
@@ -22,6 +22,9 @@ function [e, U] = TSC(Z, d, K, SC_type, q, dist)
         else
             Z_inx = Z(:,inx); 
             B(inx,j) = abs(inv(Z_inx'*Z_inx)*Z_inx'*Z(:,j));
+        end
+        if toc > 1800
+            break;
         end
     end    
     A = B + B'; 
@@ -34,7 +37,7 @@ function [e, U] = TSC(Z, d, K, SC_type, q, dist)
     end
 
     %% apply spectra clustering
-    CKSym = BuildAdjacency(thrC(A,1));
+    CKSym = BuildAdjacency(sparse(thrC(A,1)));
     if SC_type == 0
        e = SpectralClustering(CKSym, K);
     else

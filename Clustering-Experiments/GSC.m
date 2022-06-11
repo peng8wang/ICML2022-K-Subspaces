@@ -9,7 +9,7 @@ function [e, U] = GSC(Z, K, d, SC_type, q)
 
     %% default parameter setting
     N = size(Z,2); %% the number of data points
-    
+    tic;
     %% nearest subspce neighbor (NSN)
     W = zeros(N,N);
     for i = 1:N
@@ -32,11 +32,14 @@ function [e, U] = GSC(Z, K, d, SC_type, q)
            inx_i = [inx_i j];
        end
        W(i,inx_i) = 1;
+       if toc > 1800
+           break;
+       end
     end
     A = W + W';
     
     %% apply spectra clustering
-    CKSym = BuildAdjacency(thrC(A,1));
+    CKSym = BuildAdjacency(sparse(thrC(A,1)));
     if SC_type == 0
        e = SpectralClustering(CKSym, K);
     else

@@ -1,15 +1,15 @@
 
 %% Tests on real-world data sets
-% clear; clc;
+clear; clc;
 
 %% load the folders of the tested methods
 addpath('./ADMM_SSC'); addpath('./LRR');
 addpath('./LRSSC'); addpath('./SSC-OMP')
 
 %% load and pre-process the data sets 
-load('./datasets/COIL20.mat')
-Z = fea'; true_labels = gnd; %%% Z: data matrix; labels: ground truth;
-% load('./datasets/coil20Reduced.mat'); %%% load pre-processed data
+load('./datasets/cifar10.mat')
+Z = Z'; true_labels = y; %%% Z: data matrix; labels: ground truth;
+% load('.\datasets\coil20Reduced.mat'); %%% load pre-processed data
 % Z = X; true_labels = trueLabels;
 
 if min(true_labels) == 0
@@ -20,18 +20,17 @@ Z = double(Z); Z = normc(Z);
 %% parameter settings
 K = max(true_labels); %%% number of subspaces
 [n, N] = size(Z); %%% N: number of samples
-d = 10; %%% dimension of subspaces
+d = 5; %%% dimension of subspaces
 
 %% choose the running algorithms
-run_KS = 1; run_SC = 1; run_TS = 1; run_GS = 1; run_LR = 1; run_LC = 1; run_MP = 1;
+run_KS = 1; run_SC = 0; run_TS = 0; run_GS = 0; run_LR = 0; run_LC = 0; run_MP = 0;
 
 %% run the algorithms
-repeat_num = 10; max_iternum = 2e2;
+repeat_num = 1; max_iternum = 2e2;
 
 [acc_KS_collect, acc_SC_collect, acc_LR_collect,...
  acc_LC_collect, acc_TS_collect, acc_GS_collect, acc_MP_collect] = deal(zeros(repeat_num,1));
-[time_KS_collect, time_SC_collect, time_LR_collect,...
- time_LC_collect, time_TS_collect, time_GS_collect, time_MP_collect] = deal(zeros(repeat_num,1));
+[ttime_KS, ttime_SC, ttime_LR, ttime_LC, ttime_TS, ttime_GS, ttime_MP] = deal(0);
 
 for repeat = 1:repeat_num
 
@@ -39,58 +38,58 @@ for repeat = 1:repeat_num
 
     %% K-Subspaces(KSS) method
     if run_KS == 1
-        tau = 9.8e-1; SC_type = 0; %% 0 = normalized spectral clustering
-        init = 0; %% 1 = random initialization; 0 = initialization by TIPS
-        opts = struct('tau', tau, 'iternum', max_iternum, 'tol', 1e-2, 'print', 0, 'init', init, 'SC_type', SC_type);
+        tau = 9.8e-1;
+        init = 1; %% 1 = random initialization; 0 = initialization by TIPS
+        opts = struct('tau', tau, 'iternum', max_iternum, 'tol', 1e-2, 'print', 0, 'init', init);
         tic; [U_KS, e_KS] = KSS(Z, K, true_labels, d, opts); time = toc;
         acc = 1 - misRate(true_labels, e_KS)/N;
-        acc_KS_collect(repeat) = acc; time_KS_collect(repeat) = time;
+        acc_KS_collect(repeat) = acc; ttime_KS = ttime_KS + time;
         fprintf('KSS: accuracy = %.4f, time = %f\n', acc, time);
     end
     
     %% ADMM for Sparse Subspace Clustering (SSC)
     if run_SC == 1
-        [D,N] = size(Z); alpha = 10; SC_type = 0;     
+        [D,N] = size(Z); alpha = 10;      
         r = 0; affine = false; outlier = true; rho = 0.8;
-        tic; e_SC = SSC(Z, r, affine, alpha, outlier, rho, true_labels, SC_type); time = toc;
+        tic; e_SC = SSC(Z, r, affine, alpha, outlier, rho, true_labels); time = toc;
         acc = 1 - misRate(true_labels, e_SC)/N;
-        acc_SC_collect(repeat) = acc; time_SC_collect(repeat) = time;
+        acc_SC_collect(repeat) = acc; ttime_SC = ttime_SC + time;
         fprintf('ADMM SSC: accuracy = %.4f, time = %f\n', acc, time);
     end
 
     %% Thresholding-based Subspace Clustering (TSC)
     if run_TS == 1
-        q = 6; SC_type = 0;
-        tic; e_TS = TSC(Z, d, K, SC_type, q); time = toc;
-        acc = 1 - misRate(true_labels, e_TS)/N; 
-        acc_TS_collect(repeat) = acc; time_TS_collect(repeat) = time;
+        q = 6;
+        tic; e_TS = TSC(Z, d, K, q); time = toc;
+        acc = 1 - misRate(true_labels, e_TS)/N;
+        acc_TS_collect(repeat) = acc; ttime_TS = ttime_TS + time;
         fprintf('TSC: accuracy = %.4f, time = %f\n', acc, time);
     end
 
     %% Greedy Subspace Clustering (GSC) 
     if run_GS == 1
-        q = 20; SC_type = 0;
-        tic; e_GS = GSC(Z, K, d, SC_type, q); time = toc;
+        q = 20;
+        tic; e_GS = GSC(Z, K, d, q); time = toc;
         acc = 1 - misRate(true_labels, e_GS)/N;
-        acc_GS_collect(repeat) = acc; time_GS_collect(repeat) = time;
+        acc_GS_collect(repeat) = acc; ttime_GS = ttime_GS + time;
         fprintf('GSC: accuracy = %.4f, time = %f\n', acc, time);
     end
 
     %% ALM for Low-Rank Representation (LRR) for Subspace Clustering
     if run_LR == 1
-        lambda = 1e-2; reg = 1; SC_type = 0; 
-        tic; e_LR = solve_lrr(Z, Z, K, lambda, reg, 1, false, SC_type); time = toc;
+        lambda = 1e-2; reg = 1;  
+        tic; e_LR = solve_lrr(Z, Z, K, lambda, reg, 1); time = toc;
         acc = 1 - misRate(true_labels, e_LR)/N; 
-        acc_LR_collect(repeat) = acc; time_LR_collect(repeat) = time;
+        acc_LR_collect(repeat) = acc; ttime_LR = ttime_LR + time;
         fprintf('ALM LRR: accuracy = %.4f, time = %f\n', acc, time);
     end
 
     %% ADMM for Low-Rank Sparse Subspace Clustering (LRR-SSC)
     if run_LC == 1
-        sigma = 0.2; lambda = 0.5; SC_type = 0;
-        tic; e_LC = ALM_noisyLRSSC(Z, K, lambda, sigma, 0, SC_type); time = toc;
+        sigma = 0.2; lambda = 0.5; 
+        tic; e_LC = ALM_noisyLRSSC(Z, K, lambda, sigma, 1); time = toc;
         acc = 1 - misRate(true_labels, e_LC)/N;
-        acc_LC_collect(repeat) = acc; time_LC_collect(repeat) = time;
+        acc_LC_collect(repeat) = acc; ttime_LC = ttime_LC + time;
         fprintf('ADMM LRR-SSC: accuracy = %.4f, time = %f\n', acc, time);
     end
 
@@ -98,7 +97,7 @@ for repeat = 1:repeat_num
     if run_MP == 1
         tic; e_MP = SSC_OMP(Z, N, 2, K, 0); time = toc;
         acc = 1 - misRate(true_labels, e_MP)/N;
-        acc_MP_collect(repeat) = acc; time_MP_collect(repeat) = time;
+        acc_MP_collect(repeat) = acc; ttime_MP = ttime_MP + time;
         fprintf('SSC-OMP: accuracy = %.4f, time = %f\n', acc, time);
     end
 end
@@ -113,36 +112,28 @@ if run_KS*run_SC*run_GS*run_TS*run_LR*run_LC == 1
     fprintf(['Max accuracy of KS: %.4f, SSC: %.4f, TSC: %.4f, GSC: %.4f, ' ...
         'LRR: %.4f, LRR-SSC: %.4f, OMP: %.4f\n'], acc_KS, acc_SC, acc_TS, acc_GS, acc_LR, acc_LC, acc_MP);
 
+    %% The 2nd largest clustering accuracy
+    acc_KS = maxk(acc_KS_collect, 2); acc_SC = maxk(acc_SC_collect, 2);
+    acc_LR = maxk(acc_LR_collect, 2); acc_LC = maxk(acc_LC_collect, 2);
+    acc_TS = maxk(acc_TS_collect, 2); acc_GS = maxk(acc_GS_collect, 2);
+    acc_MP = maxk(acc_MP_collect, 2);
+    fprintf(['2nd max accuracy of KS: %.4f, SSC: %.4f, TSC: %.4f, GSC: %.4f, ' ...
+        'LRR: %.4f, LRR-SSC: %.4f, OMP: %.4f\n'], acc_KS(2), acc_SC(2), acc_TS(2), acc_GS(2), acc_LR(2), acc_LC(2), acc_MP(2));
+    
     %% average accuracy
     acc_KS = mean(acc_KS_collect); acc_SC = mean(acc_SC_collect);
     acc_LR = mean(acc_LR_collect); acc_LC = mean(acc_LC_collect);
     acc_TS = mean(acc_TS_collect); acc_GS = mean(acc_GS_collect);
     acc_MP = mean(acc_MP_collect);
-    fprintf(['average accuracy of KS: %.4f, SSC: %.4f, TSC: %.4f, GSC: %.4f, ' ...
+    fprintf(['Average accuracy of KS: %.4f, SSC: %.4f, TSC: %.4f, GSC: %.4f, ' ...
         'LRR: %.4f, LRR-SSC: %.4f, OMP: %.4f\n'], acc_KS, acc_SC, acc_TS, acc_GS, acc_LR, acc_LC, acc_MP);
 
-    %% standard deviation
-    acc_KS = std(acc_KS_collect); acc_SC = std(acc_SC_collect);
-    acc_LR = std(acc_LR_collect); acc_LC = std(acc_LC_collect);
-    acc_TS = std(acc_TS_collect); acc_GS = std(acc_GS_collect);
-    acc_MP = std(acc_MP_collect);
-    fprintf(['std of KS: %.4f, SSC: %.4f, TSC: %.4f, GSC: %.4f, ' ...
-        'LRR: %.4f, LRR-SSC: %.4f, OMP: %.4f\n'], acc_KS, acc_SC, acc_TS, acc_GS, acc_LR, acc_LC, acc_MP);
-    
     %% average running time
-    time_KS = mean(time_KS_collect); time_SC = mean(time_SC_collect); 
-    time_LR = mean(time_LR_collect); time_LC = mean(time_LC_collect);
-    time_TS = mean(time_TS_collect); time_GS = mean(time_GS_collect);  
-    time_MP = mean(time_MP_collect);
-    fprintf(['average time of KS: %.4f, SSC: %.4f, TSC: %.4f, GSC: %.4f, ' ...
-        'LRR: %.4f, LRR-SSC: %.4f, OMP: %.4f \n'], time_KS, time_SC, time_TS, time_GS, time_LR, time_LC, time_MP);
-
-    %% std of running time
-    time_KS = std(time_KS_collect); time_SC = std(time_SC_collect); 
-    time_LR = std(time_LR_collect); time_LC = std(time_LC_collect);
-    time_TS = std(time_TS_collect); time_GS = std(time_GS_collect);  
-    time_MP = std(time_MP_collect);
-    fprintf(['std of time of KS: %.4f, SSC: %.4f, TSC: %.4f, GSC: %.4f, ' ...
+    time_KS = ttime_KS/repeat_num; time_SC = ttime_SC/repeat_num; 
+    time_LR = ttime_LR/repeat_num; time_LC = ttime_LC/repeat_num;
+    time_TS = ttime_TS/repeat_num; time_GS = ttime_GS/repeat_num;  
+    time_MP = ttime_MP/repeat_num;
+    fprintf(['CPU time of KS: %.4f, SSC: %.4f, TSC: %.4f, GSC: %.4f, ' ...
         'LRR: %.4f, LRR-SSC: %.4f, OMP: %.4f \n'], time_KS, time_SC, time_TS, time_GS, time_LR, time_LC, time_MP);
 end
-save('Result-COIL20.mat')
+save('Result-COIL20-new.mat')
